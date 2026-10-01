@@ -1,21 +1,20 @@
-# Atividade 5 — Dissertação
+# Atividade 5: Dissertação
 
-Slides 162 e 163 do deck. Dissertação de até 30 linhas sobre a prova discursiva
-da Polícia Federal de 2018, para Perito Criminal Federal, Área 3. Consulta
+Slides 162 e 163. Dissertação de até 30 linhas sobre a prova discursiva da
+Polícia Federal de 2018, para Perito Criminal Federal, Área 3. Consulta
 permitida, citação direta proibida.
 
 ## Entregável
 
-[Atividade5-Dissertacao-PedroOliveira.docx](Atividade5-Dissertacao-PedroOliveira.docx)
+`Atividade5-Dissertacao-PedroOliveira.docx`
 
-O mesmo texto em formato corrido está em [texto-final.txt](texto-final.txt),
-para quem quiser ler sem abrir o Word.
+O mesmo texto em formato corrido está em `texto-final.txt`.
 
 ## O que a prova pede
 
-Prova CESPE/CEBRASPE, DGP/PF 2018. O texto motivador trata do volume de dados da
-Operação Lava Jato e do fato de 80% dos dados gerados hoje serem não
-estruturados, o que leva a problemas de escalabilidade e de custo.
+O texto motivador trata do volume de dados da Operação Lava Jato e do fato de
+80% dos dados gerados hoje serem não estruturados, o que leva a problemas de
+escalabilidade e custo.
 
 | # | Pergunta | Valor |
 |---|---|---|
@@ -26,13 +25,15 @@ estruturados, o que leva a problemas de escalabilidade e de custo.
 ## Como o texto foi organizado
 
 A questão 2 vale quase metade dos pontos de conteúdo, então ocupa quase metade
-das 30 linhas: 8 linhas para a questão 1, 12 para a 2 e 10 para a 3.
+do espaço: 8 linhas para a primeira, 12 para a segunda e 9 para a terceira.
 
 Os três modelos escolhidos foram documentos, chave-valor e família de colunas,
-com uma menção ao modelo de grafos ao final. São os quatro que foram usados na
-prática ao longo da disciplina, em MongoDB, Riak, Cassandra e Neo4j.
+com uma menção ao modelo de grafos no fim. São os mesmos que foram usados nas
+Atividades 1 a 4, em MongoDB, Riak, Cassandra e Neo4j.
 
-A questão 3 trata de injeção NoSQL, assunto que não é coberto pelo deck. O
-conteúdo veio da documentação do MongoDB sobre validação de entrada e dos
-operadores que permitem o ataque, principalmente `$ne`, `$gt`, `$regex` e
-`$where`.
+A questão 3 trata de injeção NoSQL, que não é assunto do material da
+disciplina. O conteúdo veio da documentação do MongoDB sobre validação de
+entrada e dos operadores que permitem o ataque, principalmente `$ne`, `$gt`,
+`$regex` e `$where`.
+
+O documento tem 30 linhas e uma página, contadas no Word.

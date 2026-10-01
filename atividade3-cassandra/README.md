@@ -1,107 +1,74 @@
-# Atividade 3 — Cassandra (slides 98–100)
+# Atividade 3: Cassandra
 
-Keyspace `unipe`, tabela `cadastro`, seis registros; depois alterar, excluir e
-consultar por cargo.
+Slides 98 a 100. Criar o keyspace `unipe` e a tabela `cadastro`, inserir seis
+registros, depois alterar um cargo, excluir um registro e consultar por cargo.
 
-## Como reproduzir
+## Como rodar
 
 ```powershell
 docker compose -f infra/docker-compose.atividades.yml up -d cassandra
-# o Cassandra leva ~60 s para aceitar CQL; o healthcheck do compose avisa
 
-docker exec -i unipe-cassandra cqlsh < atividades/atividade3-cassandra/atividade3.cql
+docker exec -i unipe-cassandra cqlsh < atividade3-cassandra/atividade3.cql
 ```
 
-Os prints foram gerados por `scripts/capturar-terminal.ps1`, que roda os
-comandos num console de verdade e fotografa a janela.
+O Cassandra leva cerca de 60 segundos para aceitar CQL depois de subir. O
+healthcheck do compose avisa quando está pronto.
 
 ## Entregáveis
 
-| Arquivo | Etapa | O que mostra |
-|---|---|---|
-| `entrega/etapa1-keyspace-tabela-registros.png` | 1 | criação do keyspace e da tabela + os 6 registros |
-| `entrega/etapa2a-update-e-delete.png` | 2 | Theo passa a funcionário, Afonso é excluído (6 → 5 linhas) |
-| `entrega/etapa2b-buscar-por-cargo.png` | 2 | buscar professores e alunos — e o que o Cassandra exige para isso |
+| Arquivo | Etapa |
+|---|---|
+| `entrega/etapa1-keyspace-tabela-registros.png` | keyspace, tabela e os 6 registros |
+| `entrega/etapa2a-update-e-delete.png` | Theo passa a funcionário, Afonso é excluído |
+| `entrega/etapa2b-buscar-por-cargo.png` | busca por cargo, e o que o Cassandra exige para isso |
 
 ## Resultado
 
-Depois da Etapa 2, com Afonso removido e Theo mudado de cargo:
+Depois da etapa 2:
 
 | cargo | quem |
 |---|---|
 | professor | Thyago |
 | aluno | Fernanda |
-| funcionario | Leonardo, Sophia, **Theo** |
+| funcionario | Leonardo, Sophia, Theo |
 
-## O que a atividade ensina de verdade
+## Notas
 
-### 1. O `WHERE` do `UPDATE` e do `DELETE` só aceita a chave primária
+**O `WHERE` do `UPDATE` e do `DELETE` só aceita a chave primária.** Não existe
+`WHERE nome = 'Theo'`. O Cassandra precisa saber em qual partição vai escrever
+antes de escrever, e quem determina a partição é a chave. É por isso que o
+enunciado entrega os UUIDs prontos: sem eles não dá para fazer a etapa 2.
 
-```sql
-UPDATE cadastro SET cargo = 'funcionario'
-  WHERE id = 04b57f0e-33df-11e5-a151-feff819cdc9f;   -- Theo
-```
-
-Não existe `WHERE nome = 'Theo'`. O Cassandra precisa saber **em qual partição
-escrever** antes de escrever — e quem determina a partição é a chave. Por isso
-a atividade dá os UUIDs prontos: sem eles não dá para fazer a Etapa 2.
-
-### 2. `SELECT` por coluna comum é recusado pelo banco
-
-Este é o ponto alto da atividade, e ele **falha de propósito**:
+**O `SELECT` por coluna comum é recusado.** Esta consulta falha de propósito:
 
 ```sql
 SELECT nome, cargo FROM cadastro WHERE cargo = 'professor';
 ```
+
 ```
 InvalidRequest: Cannot execute this query as it might involve data filtering
 and thus may have unpredictable performance. If you want to execute this query
 despite the performance unpredictability, use ALLOW FILTERING
 ```
 
-O Cassandra **se recusa a executar uma consulta cujo custo ele não consegue
-prever**. Num cluster real, filtrar por uma coluna que não é chave significa
-perguntar a todos os nós e juntar as respostas — custo que cresce com o
-tamanho do cluster, não com o do resultado.
+O banco se recusa a rodar uma consulta cujo custo ele não consegue prever. Num
+cluster, filtrar por coluna que não é chave significa perguntar para todos os
+nós e juntar as respostas. Um banco relacional aceitaria e faria a varredura
+completa sem avisar.
 
-Compare com o comportamento de um banco relacional, que aceitaria a consulta e
-faria um *full table scan* em silêncio. A diferença de filosofia é o conteúdo
-da aula: **o Cassandra prefere recusar a mentir sobre o custo.**
+Há três saídas. `ALLOW FILTERING` manda executar assim mesmo, varrendo tudo.
+Um índice secundário cria uma estrutura de busca pelo campo. A terceira é a
+forma idiomática do Cassandra: criar uma tabela por consulta, com `cargo` como
+chave de partição. É a modelagem dirigida pela consulta, onde se parte da
+pergunta e se monta a tabela para respondê-la.
 
-Duas saídas, e elas não são equivalentes:
-
-| | `ALLOW FILTERING` | Índice secundário |
-|---|---|---|
-| O que faz | manda executar assim mesmo | cria uma estrutura de busca por `cargo` |
-| Custo | varre tudo, toda vez | consulta direcionada |
-| Quando serve | exploração, base pequena | quando a consulta é recorrente |
-
-E existe uma terceira, que é **a resposta idiomática do Cassandra**: não
-consultar por coluna comum, e sim **modelar uma tabela por consulta**. Se
-"listar por cargo" é uma pergunta frequente, cria-se `cadastro_por_cargo` com
-`cargo` como chave de partição. É o que o material chama de *modelagem dirigida
-pela consulta*: em Cassandra você não modela o dado e depois consulta — você
-parte da consulta e modela para ela.
-
-### 3. A ordem do `SELECT` não é a ordem de inserção
-
-```
-Leonardo | funcionario
-Thyago   | professor
-Afonso   | professor
-Fernanda | aluno
-Sophia   | funcionario
-Theo     | aluno
-```
-
-Inseri na ordem Thyago, Afonso, Fernanda, Theo, Sophia, Leonardo — e saiu
-diferente. As linhas voltam ordenadas pelo **token** da chave de partição, que
-é o hash do `id`. Sem chave de clustering não existe ordenação previsível, e
-`ORDER BY` em coluna arbitrária não é aceito.
+**A ordem do resultado não é a ordem de inserção.** Inseri na ordem Thyago,
+Afonso, Fernanda, Theo, Sophia, Leonardo, e o `SELECT` devolveu outra. As
+linhas voltam ordenadas pelo token da chave de partição, que é o hash do `id`.
+Sem coluna de clustering não existe ordem previsível.
 
 ## Ambiente
 
-Cassandra **5.0.9** em container (`cassandra:5`), nó único, `SimpleStrategy`
-com fator de replicação 1. Num cluster real seria `NetworkTopologyStrategy`.
-O heap está limitado a 512 MB no compose — sem teto, o Cassandra reserva 1/4
-da RAM da máquina para guardar seis linhas.
+Cassandra 5.0.9 em contêiner (`cassandra:5`), nó único, `SimpleStrategy` com
+fator de replicação 1. O heap está limitado a 512 MB no compose, porque sem
+teto ele reserva um quarto da RAM da máquina para guardar seis linhas.
