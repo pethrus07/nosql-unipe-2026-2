@@ -1,0 +1,105 @@
+# Bancos que sobem sob demanda: Atividades 2, 3 e 4 do deck (Riak, Cassandra,
+# Neo4j) e o Redis da Lista 01 / aula 05.
+#
+# Ficam SEPARADOS do docker-compose.yml principal de proposito: o MongoDB roda
+# todo dia e e leve; estes tres so sao necessarios nas atividades e comem RAM
+# (Cassandra e Neo4j sobem JVM). Assim da para subir so o que precisa.
+#
+#   subir tudo:     docker compose -f infra/docker-compose.atividades.yml up -d
+#   subir um so:    docker compose -f infra/docker-compose.atividades.yml up -d cassandra
+#   parar:          docker compose -f infra/docker-compose.atividades.yml down
+#   apagar dados:   docker compose -f infra/docker-compose.atividades.yml down -v
+#
+# Nome de projeto proprio pelo mesmo motivo do compose principal: sem ele os
+# containers de outros projetos aparecem como 'orphans'.
+name: nosql-unipe-atividades
+
+services:
+
+  # --- Atividade 2: banco chave-valor -------------------------------------
+  # O Riak KV foi descontinuado pela Basho; esta e a ultima imagem publicada.
+  # A API HTTP (8098) e a que a atividade pede: insercao e leitura por curl.
+  riak:
+    image: basho/riak-kv:latest
+    container_name: unipe-riak
+    ports:
+      - "8098:8098"   # HTTP
+      - "8087:8087"   # Protocol Buffers
+    environment:
+      CLUSTER_NAME: unipe
+      # O entrypoint da imagem desiste do boot em 15 s e o container morre sem
+      # deixar erro util - o Erlang do Riak leva mais que isso nesta maquina.
+      WAIT_FOR_ERLANG: "120"
+    labels:
+      com.basho.riak.cluster.name: unipe
+    volumes:
+      - riak_data:/var/lib/riak
+      # troca o backend para leveldb; sem isso indice secundario da 500
+      - ./riak/user.conf:/etc/riak/user.conf:ro
+
+  # --- Atividade 3: banco colunar ----------------------------------------
+  cassandra:
+    image: cassandra:5
+    container_name: unipe-cassandra
+    ports:
+      - "9042:9042"   # CQL
+    environment:
+      CASSANDRA_CLUSTER_NAME: unipe
+      # Cassandra sobe pedindo 1/4 da RAM da maquina; sem teto ele reserva
+      # varios GB a toa para uma tabela de 6 linhas.
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 128M
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 60s
+
+  # --- Atividade 4: banco de grafos --------------------------------------
+  neo4j:
+    image: neo4j:5
+    container_name: unipe-neo4j
+    ports:
+      - "7474:7474"   # Neo4j Browser (e de onde sai o print do grafo)
+      - "7687:7687"   # Bolt
+    environment:
+      # usuario padrao e 'neo4j'; a senha precisa ter 8+ caracteres
+      NEO4J_AUTH: neo4j/unipe2026
+      NEO4J_server_memory_heap_max__size: 512M
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # --- Aula 05 / Lista 01: o outro banco chave-valor ---------------------
+  # O enunciado do professor instala o Redis dentro do WSL. Em container o
+  # servidor e o mesmo e os comandos sao identicos - muda so como se conecta:
+  #   docker exec -it unipe-redis redis-cli
+  redis:
+    image: redis:7-alpine
+    container_name: unipe-redis
+    ports:
+      - "6379:6379"
+    # appendonly liga o AOF: o slide 24 fala de RDB x AOF, e assim da para ver
+    # o arquivo crescendo a cada escrita em vez de so ler sobre ele.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  riak_data:
+  cassandra_data:
+  neo4j_data:
+  redis_data:

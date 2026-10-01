@@ -1,0 +1,9 @@
+# Dependencias do Desafio GeoLog. O enunciado exige pymongo para o MongoDB e
+# sqlite3 ou SQLAlchemy para o relacional - aqui usamos o sqlite3, que ja vem
+# na biblioteca padrao do Python e por isso nao aparece nesta lista.
+streamlit>=1.30
+pymongo>=4.6
+pandas>=2.0
+plotly>=5.18
+folium>=0.15
+streamlit-folium>=0.18

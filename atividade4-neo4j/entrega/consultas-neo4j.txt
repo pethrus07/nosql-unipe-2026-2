@@ -1,0 +1,235 @@
+========================================================================
+UNIPE - Implementacao e Gerenciamento de Bancos de Dados NoSQL (12865)
+Prof. Me. Ricardo Roberto de Lima
+Aluno: Pedro Oliveira
+
+ATIVIDADE 4 - Neo4j (slides 145-152)
+Entregavel: arquivo texto com todas as consultas realizadas
+========================================================================
+
+Ambiente: Neo4j 5.26.30 Community em container Docker.
+Executado via cypher-shell; os prints do grafo saem do Neo4j Browser (:7474).
+
+
+########################################################################
+PARTE 1 - Modelar o grafo da rede social  (slide 146)
+########################################################################
+
+MATCH (n) DETACH DELETE n;
+
+CREATE (gabriel:Pessoa { nome: 'Gabriel', pais: 'Canada', estadoCivil: 'Namorando' })
+CREATE (carol:Pessoa   { nome: 'Carol',   pais: 'Brasil' })
+CREATE (foto:Foto      { legenda: 'Meu cachorro' })
+
+CREATE (gabriel)-[:SEGUE]->(carol)
+CREATE (carol)-[:SEGUE]->(gabriel)
+CREATE (gabriel)-[:CURTIU { data: date('2019-01-01') }]->(foto)
+CREATE (carol)-[:ADICIONOU]->(foto);
+
+-- Conferencia
+MATCH (n) RETURN labels(n)[0] AS tipo, properties(n) AS propriedades ORDER BY tipo;
+
+   "Foto",   {legenda: "Meu cachorro"}
+   "Pessoa", {nome: "Gabriel", estadoCivil: "Namorando", pais: "Canada"}
+   "Pessoa", {nome: "Carol", pais: "Brasil"}
+
+MATCH (a)-[r]->(b)
+RETURN a.nome AS de, type(r) AS relacionamento,
+       coalesce(b.nome, b.legenda) AS para, properties(r) AS props;
+
+   "Gabriel", "SEGUE",     "Carol",        {}
+   "Carol",   "SEGUE",     "Gabriel",      {}
+   "Gabriel", "CURTIU",    "Meu cachorro", {data: 2019-01-01}
+   "Carol",   "ADICIONOU", "Meu cachorro", {}
+
+OBSERVACAO: Carol nao recebe a propriedade estadoCivil. Nao e esquecimento -
+e o que torna possivel a consulta 5 da Parte 2. Num banco relacional a coluna
+existiria com NULL; em Neo4j a propriedade simplesmente nao existe no no.
+
+Print: entrega/grafo-01-rede-social-inicial.png
+
+
+########################################################################
+PARTE 2 - Extrair informacoes dos usuarios  (slide 148)
+########################################################################
+
+-- 1) O nome e o pais de um usuario
+MATCH (p:Pessoa { nome: 'Gabriel' })
+RETURN p.nome AS nome, p.pais AS pais;
+
+   "Gabriel", "Canada"
+
+-- 2) A legenda de todas as fotos de um usuario
+MATCH (p:Pessoa { nome: 'Carol' })-[:ADICIONOU]->(f:Foto)
+RETURN p.nome AS usuario, f.legenda AS legenda;
+
+   "Carol", "Meu cachorro"
+
+-- 3) A quantidade de pessoas que segue um usuario
+--    A direcao da seta E a resposta: quem segue Carol aponta PARA ela.
+MATCH (seguidor:Pessoa)-[:SEGUE]->(:Pessoa { nome: 'Carol' })
+RETURN count(seguidor) AS seguidores_de_carol;
+
+   1
+
+-- 4) A quantidade de fotos publicadas
+MATCH (f:Foto)
+RETURN count(f) AS fotos_publicadas;
+
+   1
+
+-- 5) Nome dos usuarios que nao possuam Estado Civil cadastrado
+--    IS NULL casa tanto com propriedade ausente quanto com valor nulo.
+MATCH (p:Pessoa)
+WHERE p.estadoCivil IS NULL
+RETURN p.nome AS sem_estado_civil;
+
+   "Carol"
+
+-- 6) A quantidade de curtidas que uma foto recebeu
+MATCH (:Pessoa)-[c:CURTIU]->(f:Foto { legenda: 'Meu cachorro' })
+RETURN f.legenda AS foto, count(c) AS curtidas;
+
+   "Meu cachorro", 1
+
+
+########################################################################
+PARTE 3 - Atualizar o grafo  (slide 149)
+########################################################################
+
+-- 1) Informe que Carol casou
+MATCH (c:Pessoa { nome: 'Carol' })
+SET c.estadoCivil = 'Casada'
+RETURN c.nome AS nome, c.estadoCivil AS estado_civil;
+
+   "Carol", "Casada"
+
+-- 2) Gabriel saiu da rede, portanto exclua ele do grafo
+--
+--    ATENCAO: "DELETE g" sozinho FALHA:
+--      Cannot delete node<0>, because it still has relationships.
+--    O Neo4j se recusa a deixar relacionamento apontando para o vazio.
+--    DETACH DELETE apaga o no e os relacionamentos dele junto.
+MATCH (g:Pessoa { nome: 'Gabriel' })
+DETACH DELETE g;
+
+-- 3) Cadastre um novo usuario (Linda, EUA, Solteira)
+CREATE (l:Pessoa { nome: 'Linda', pais: 'EUA', estadoCivil: 'Solteira' })
+RETURN l.nome AS criado, l.pais AS pais, l.estadoCivil AS estado_civil;
+
+   "Linda", "EUA", "Solteira"
+
+-- 4) Faca com que Linda siga Carol e vice-versa
+MATCH (l:Pessoa { nome: 'Linda' }), (c:Pessoa { nome: 'Carol' })
+CREATE (l)-[:SEGUE]->(c)
+CREATE (c)-[:SEGUE]->(l);
+
+-- 5) Faca com que Linda adicione uma foto com a legenda "Ingressando na rede!"
+MATCH (l:Pessoa { nome: 'Linda' })
+CREATE (l)-[:ADICIONOU]->(f:Foto { legenda: 'Ingressando na rede!' })
+RETURN f.legenda AS foto_criada;
+
+   "Ingressando na rede!"
+
+-- 6) Faca com que Carol curta a foto, com a data de hoje
+MATCH (c:Pessoa { nome: 'Carol' }), (f:Foto { legenda: 'Ingressando na rede!' })
+CREATE (c)-[:CURTIU { data: date() }]->(f);
+
+-- 7) A quantidade de curtidas que uma foto recebeu
+MATCH (:Pessoa)-[cur:CURTIU]->(f:Foto { legenda: 'Ingressando na rede!' })
+RETURN f.legenda AS foto, count(cur) AS curtidas;
+
+   "Ingressando na rede!", 1
+
+-- Estado final
+   "Foto",   {legenda: "Meu cachorro"}
+   "Foto",   {legenda: "Ingressando na rede!"}
+   "Pessoa", {estadoCivil: "Casada",   nome: "Carol", pais: "Brasil"}
+   "Pessoa", {estadoCivil: "Solteira", nome: "Linda", pais: "EUA"}
+
+   "Carol", "ADICIONOU", "Meu cachorro",         {}
+   "Linda", "SEGUE",     "Carol",                {}
+   "Carol", "SEGUE",     "Linda",                {}
+   "Linda", "ADICIONOU", "Ingressando na rede!", {}
+   "Carol", "CURTIU",    "Ingressando na rede!", {data: 2026-09-13}
+
+OBSERVACAO: apagar Gabriel levou junto o CURTIU dele. A foto "Meu cachorro"
+ficou com ZERO curtidas e sem ninguem que a curtiu - efeito em cascata que o
+DETACH DELETE produz e que nao aparece no enunciado.
+
+Print: entrega/grafo-02-rede-social-atualizado.png
+
+
+########################################################################
+PARTE 4 - Segundo grafo e caminho mais curto  (slides 150-152)
+########################################################################
+
+MATCH (n) DETACH DELETE n;
+
+CREATE (rafael:Pessoa    { nome: 'Rafael' })
+CREATE (ana:Pessoa       { nome: 'Ana' })
+CREATE (paulo:Pessoa     { nome: 'Paulo' })
+CREATE (carol:Pessoa     { nome: 'Carol' })
+CREATE (franciele:Pessoa { nome: 'Franciele' })
+CREATE (gabriel:Pessoa   { nome: 'Gabriel' })
+CREATE (renata:Pessoa    { nome: 'Renata' })
+
+-- cada seta DUPLA do slide vira dois relacionamentos dirigidos
+CREATE (rafael)-[:SEGUE]->(franciele), (franciele)-[:SEGUE]->(rafael)
+CREATE (franciele)-[:SEGUE]->(ana),    (ana)-[:SEGUE]->(franciele)
+CREATE (ana)-[:SEGUE]->(paulo),        (paulo)-[:SEGUE]->(ana)
+CREATE (paulo)-[:SEGUE]->(carol),      (carol)-[:SEGUE]->(paulo)
+CREATE (franciele)-[:SEGUE]->(gabriel),(gabriel)-[:SEGUE]->(franciele)
+CREATE (gabriel)-[:SEGUE]->(carol),    (carol)-[:SEGUE]->(gabriel)
+CREATE (gabriel)-[:SEGUE]->(renata),   (renata)-[:SEGUE]->(gabriel)
+CREATE (renata)-[:SEGUE]->(carol),     (carol)-[:SEGUE]->(renata);
+
+MATCH (p:Pessoa) RETURN count(p) AS pessoas;                  ->  7
+MATCH ()-[r:SEGUE]->() RETURN count(r) AS relacionamentos;    -> 16
+
+Print do grafo completo: entrega/grafo-03-rede-7-pessoas.png
+
+
+-- CAMINHO MAIS CURTO ENTRE RAFAEL E ANA  (o que o slide 152 pede em texto)
+MATCH caminho = shortestPath(
+        (a:Pessoa { nome:'Rafael' })-[:SEGUE*]-(b:Pessoa { nome:'Ana' }) )
+RETURN [n IN nodes(caminho) | n.nome] AS caminho, length(caminho) AS saltos;
+
+   ["Rafael", "Franciele", "Ana"], 2
+
+Print: entrega/grafo-05-caminho-rafael-ana.png
+
+
+-- CAMINHO MAIS CURTO ENTRE RAFAEL E CAROL
+-- (o que as setas vermelhas do slide 150 destacam - ver divergencia no README)
+MATCH caminho = shortestPath(
+        (a:Pessoa { nome:'Rafael' })-[:SEGUE*]-(b:Pessoa { nome:'Carol' }) )
+RETURN [n IN nodes(caminho) | n.nome] AS caminho, length(caminho) AS saltos;
+
+   ["Rafael", "Franciele", "Gabriel", "Carol"], 3
+
+Print: entrega/grafo-04-caminho-rafael-carol.png
+
+
+-- Todos os caminhos mais curtos
+-- ATENCAO ao DISTINCT: sem ele esta consulta devolve o MESMO caminho 8 vezes.
+-- O caminho do Neo4j percorre RELACIONAMENTOS, nao nos, e cada ligacao do
+-- slide (seta dupla) sao dois relacionamentos. Com 3 ligacoes no caminho sao
+-- 2x2x2 = 8 combinacoes de arestas sobre a mesma sequencia de pessoas.
+MATCH caminho = allShortestPaths(
+        (a:Pessoa { nome:'Rafael' })-[:SEGUE*]-(b:Pessoa { nome:'Carol' }) )
+RETURN DISTINCT [n IN nodes(caminho) | n.nome] AS caminho, length(caminho) AS saltos;
+
+   ["Rafael", "Franciele", "Gabriel", "Carol"], 3     (unico)
+
+
+-- Caminhos mais longos sem repetir pessoa, para dimensionar o que o
+-- shortestPath evitou percorrer
+MATCH caminho = (a:Pessoa { nome:'Rafael' })-[:SEGUE*..6]-(b:Pessoa { nome:'Carol' })
+WHERE all(n IN nodes(caminho) WHERE single(x IN nodes(caminho) WHERE x = n))
+RETURN DISTINCT [n IN nodes(caminho) | n.nome] AS caminho, length(caminho) AS saltos
+ORDER BY saltos DESC LIMIT 5;
+
+   ["Rafael", "Franciele", "Ana",     "Paulo",  "Carol"], 4
+   ["Rafael", "Franciele", "Gabriel", "Renata", "Carol"], 4
+   ["Rafael", "Franciele", "Gabriel", "Carol"],           3

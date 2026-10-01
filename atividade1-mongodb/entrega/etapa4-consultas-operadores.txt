@@ -1,0 +1,127 @@
+========================================================================
+UNIPE - Implementacao e Gerenciamento de Bancos de Dados NoSQL (12865)
+Prof. Me. Ricardo Roberto de Lima
+Aluno: Pedro Oliveira
+
+ATIVIDADE 1 - MongoDB
+ETAPA 4 - Executando consultas com operadores
+Entregavel: arquivo texto com os comandos utilizados para cada consulta
+========================================================================
+
+Base utilizada: banco "atividade1", colecao "restaurants"
+Documentos na colecao: 25360
+
+
+------------------------------------------------------------------------
+1) Listar todos os restaurantes com pontuacao (score) maior que 30
+------------------------------------------------------------------------
+
+db.restaurants.find( { "grades.score": { $gt: 30 } } )
+
+Resultado: 1959 documentos.
+
+Observacao: "score" esta dentro dos subdocumentos do array "grades". Ao
+aplicar um operador sobre um campo de array, o MongoDB retorna o
+documento se QUALQUER elemento satisfizer a condicao. Ou seja, sao os
+restaurantes que em ALGUMA inspecao tiraram mais de 30.
+
+
+------------------------------------------------------------------------
+2) Listar todos os restaurantes com pontuacao (score) menor que 10
+------------------------------------------------------------------------
+
+db.restaurants.find( { "grades.score": { $lt: 10 } } )
+
+Resultado: 19065 documentos.
+
+Observacao: 1959 + 19065 = 21024, que e mais do que parece caber, mas os
+dois conjuntos se sobrepoem: 1244 restaurantes aparecem nas DUAS listas,
+por terem inspecoes boas e ruins no historico.
+
+Exemplo - "Brunos On The Boulevard" (Queens):
+   nota Z  score 38   -> satisfaz a consulta 1
+   nota A  score 10
+   nota A  score  7   -> satisfaz a consulta 2
+   nota A  score 13
+
+Para exigir que a condicao seja satisfeita pelo MESMO elemento do array,
+seria necessario o operador $elemMatch. Exemplo de uma faixa:
+
+   db.restaurants.find( { "grades": { $elemMatch: { $gt: 10, $lt: 30 } } } )
+
+Nas consultas 1 e 2 isso nao se aplica, pois ha apenas uma condicao.
+
+
+------------------------------------------------------------------------
+3) Listar todos os restaurantes com culinaria (cuisine) italiana
+   ("Italian") E com CEP "10075"
+------------------------------------------------------------------------
+
+db.restaurants.find( { "cuisine": "Italian", "address.zipcode": "10075" } )
+
+Resultado: 16 documentos.
+
+   Don Filippo Restaurant      Maruzzella            Uva
+   Lusardi'S Restaurant        Il Riccio Restaurant  Sant Ambroeus
+   Due                         Cafe Buon Gusto       Alloro
+   Serafina Fabulous Pizza     Al Forno              Bocca
+   Parma Restaurant            Vella                 Spigolo
+                                                     Vella
+
+Observacao 1: o operador AND e implicito. Duas condicoes separadas por
+virgula dentro do mesmo documento de filtro precisam ser satisfeitas
+simultaneamente. Nao e necessario escrever $and.
+
+Observacao 2: "Vella" aparece duas vezes porque esse restaurante ja
+existia na base importada e foi inserido novamente na Etapa 2, conforme
+o documento do slide. O MongoDB permitiu a duplicata porque nao ha
+indice unico sobre "restaurant_id" - o unico campo com unicidade
+garantida e o "_id", que e gerado automaticamente. Sem a insercao da
+Etapa 2, o resultado seria 15.
+
+
+------------------------------------------------------------------------
+4) Listar todos os restaurantes com culinaria (cuisine) italiana
+   ("Italian") OU com CEP "10075"
+------------------------------------------------------------------------
+
+db.restaurants.find( { $or: [ { "cuisine": "Italian" },
+                              { "address.zipcode": "10075" } ] } )
+
+Resultado: 1154 documentos.
+
+Observacao: diferente do AND, o OR exige o operador $or explicito, e o
+argumento e um ARRAY de condicoes.
+
+Conferencia pelo principio da inclusao-exclusao:
+   restaurantes italianos ................. 1070
+   restaurantes com CEP 10075 .............  100
+   que satisfazem as duas (consulta 3) ....   16
+   total do $or: 1070 + 100 - 16 = 1154
+
+A subtracao existe porque os 16 que satisfazem as duas condicoes seriam
+contados duas vezes; o $or os conta uma unica vez.
+
+
+------------------------------------------------------------------------
+Nota sobre a interpretacao do campo "score"
+------------------------------------------------------------------------
+
+No sistema de inspecao sanitaria de Nova York, pontuacao MENOR indica
+resultado MELHOR. A media de score por nota atribuida, calculada sobre a
+propria base, confirma:
+
+   nota A   score medio  9.0   (74657 inspecoes)
+   nota B   score medio 20.0   (12604 inspecoes)
+   nota C   score medio 30.7   ( 3145 inspecoes)
+
+Portanto a consulta 1 ("score maior que 30") retorna os restaurantes com
+as PIORES inspecoes, e nao os mais bem avaliados.
+
+
+========================================================================
+Ambiente de execucao
+========================================================================
+
+MongoDB 7 em container Docker (imagem oficial mongo:7), acessado via
+mongosh 2.9.2.

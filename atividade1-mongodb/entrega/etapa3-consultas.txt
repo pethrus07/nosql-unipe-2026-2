@@ -1,0 +1,79 @@
+========================================================================
+UNIPE - Implementacao e Gerenciamento de Bancos de Dados NoSQL (12865)
+Prof. Me. Ricardo Roberto de Lima
+Aluno: Pedro Oliveira
+
+ATIVIDADE 1 - MongoDB
+ETAPA 3 - Executando consultas
+Entregavel: arquivo texto com os comandos utilizados para cada consulta
+========================================================================
+
+Base utilizada: banco "atividade1", colecao "restaurants"
+Documentos na colecao: 25360
+   (25359 importados de restaurantes.json + 1 inserido na Etapa 2)
+
+
+------------------------------------------------------------------------
+1) Listar todos os restaurantes
+------------------------------------------------------------------------
+
+db.restaurants.find()
+
+Resultado: 25360 documentos.
+
+Observacao: find() sem argumento usa filtro vazio, que casa com todos os
+documentos. O retorno e um cursor; o shell exibe 20 por vez e continua
+com o comando "it".
+
+
+------------------------------------------------------------------------
+2) Encontrar todos os restaurantes do bairro (borough) "Manhattan"
+------------------------------------------------------------------------
+
+db.restaurants.find( { "borough": "Manhattan" } )
+
+Resultado: 10260 documentos.
+
+Observacao: "borough" e um campo de primeiro nivel do documento, logo a
+comparacao e direta.
+
+
+------------------------------------------------------------------------
+3) Encontrar todos os restaurantes com CEP (zipcode) "10022"
+------------------------------------------------------------------------
+
+db.restaurants.find( { "address.zipcode": "10022" } )
+
+Resultado: 485 documentos.
+
+Observacao: "zipcode" esta dentro do subdocumento "address", por isso a
+notacao de ponto "address.zipcode". O valor vai entre aspas porque o CEP
+esta armazenado como string; escrito como numero (10022) o resultado
+seria zero, pois o MongoDB nao faz conversao de tipo na comparacao.
+
+
+------------------------------------------------------------------------
+4) Encontrar todos os restaurantes que possuam alguma nota (grade) "B"
+------------------------------------------------------------------------
+
+db.restaurants.find( { "grades.grade": "B" } )
+
+Resultado: 8281 documentos.
+
+Observacao: "grades" e um array de subdocumentos. Ao aplicar a notacao de
+ponto sobre um array, o MongoDB considera o documento como correspondente
+se QUALQUER elemento do array satisfizer a condicao - que e exatamente o
+que a questao pede ("possuam alguma nota B").
+
+Exemplo: o restaurante "Morris Park Bake Shop" tem as notas A, A, A, A, B
+e e retornado por causa da ultima.
+
+
+========================================================================
+Ambiente de execucao
+========================================================================
+
+MongoDB 7 em container Docker (imagem oficial mongo:7), acessado via
+mongosh. Importacao da base feita com:
+
+   mongoimport --db atividade1 --collection restaurants --file restaurantes.json

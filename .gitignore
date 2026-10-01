@@ -1,0 +1,14 @@
+# Ambiente Python
+.venv/
+__pycache__/
+*.pyc
+
+# Segredos
+.env
+
+# Bancos gerados na execucao
+*.db
+
+# Sistema
+Thumbs.db
+desktop.ini
