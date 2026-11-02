@@ -75,4 +75,4 @@ its size. It is MongoDB's official primer dataset, available at
 
 ## License
 
-All rights reserved.
+MIT. See [LICENSE](LICENSE).

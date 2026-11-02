@@ -75,4 +75,4 @@ o primer-dataset oficial do MongoDB, disponível em
 
 ## Licença
 
-Todos os direitos reservados.
+MIT. Veja [LICENSE](LICENSE).
